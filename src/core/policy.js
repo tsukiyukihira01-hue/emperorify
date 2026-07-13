@@ -1,5 +1,5 @@
 export class WritePolicy{
-  constructor(){this.globalOwners=new Map()}
+  constructor(){ this.globalOwners=new Map() }
   check(sys){
     for(const C of sys.writes||[]){
       const n=C.name
@@ -10,6 +10,16 @@ export class WritePolicy{
     }
     return null
   }
-  claim(sys){for(const C of sys.writes||[]) this.globalOwners.set(C.name, sys.constructor.name)}
-  dump(){return [...this.globalOwners.entries()].map(([c,o])=>`${c}->${o}`).join(', ')}
+  claim(sys){ for(const C of sys.writes||[]) this.globalOwners.set(C.name, sys.constructor.name) }
+  dump(){ return [...this.globalOwners.entries()].map(([c,o])=>`${c}->${o}`).join(', ') }
+}
+export const CANONICAL_OWNERS={
+  Position:'MovementSystem',
+  Army:'CombatSystem',
+  Province:'EconomySystem',
+  Economy:'EconomySystem',
+  Relation:'DiplomacySystem',
+  TradeRoute:'TradeSystem',
+  Building:'BuilderSystem',
+  MoveOrder:'MovementSystem'
 }
