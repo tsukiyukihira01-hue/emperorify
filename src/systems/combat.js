@@ -1,25 +1,2 @@
-import { Army, Position } from '../components/index.js'
-
-export class CombatSystem {
-  reads = new Set([Army, Position])
-  writes = new Set([Army])
-  phase = 'combat'
-  update(world, events, dt){
-    const buckets = new Map()
-    for(const [eid, [pos, army]] of world.query(Position, Army)){
-      const k = pos.provinceId|0
-      if(!buckets.has(k)) buckets.set(k, [])
-      buckets.get(k).push([eid, army])
-    }
-    for(const [provId, list] of buckets){
-      if(list.length<2) continue
-      // if different owners in same province, emit battle, do not touch Province.owner here
-      const owners = new Set(list.map(([,a])=>a.ownerId))
-      if(owners.size>1){
-        events.emit('battle_started', {provinceId:provId, armies:list.map(([id])=>id)})
-        // example damage, this system is the ONLY writer of Army in combat phase
-        for(const [, army] of list) army.morale = Math.max(0, army.morale-0.05)
-      }
-    }
-  }
-}
+import { Position, Army, Province, Relation } from '../components/index.js'
+export class CombatSystem{reads=new Set([Position, Army, Province, Relation]);writes=new Set([Army]);phase='combat';update(world,events,dt){const byProv=new Map();for(const[eid,[pos,army]] of world.query(Position,Army)){if(army.troops<=0) continue;const pid=pos.provinceId;if(!byProv.has(pid)) byProv.set(pid,[]);byProv.get(pid).push({eid,pos,army})}const atWar=new Set();for(const[,[rel]] of world.query(Relation)){if(rel.value<=-75) atWar.add(`${rel.ownerId}->${rel.targetId}`)}let battles=0,casualties=0;for(const[pid,list] of byProv){if(list.length<2) continue;const owners=[...new Set(list.map(x=>x.army.ownerId))];if(owners.length<2) continue;let hostile=false;for(const a of owners){for(const b of owners){if(a!==b&&(atWar.has(`${a}->${b}`)||atWar.has(`${b}->${a}`)||Math.random()<0.3)) hostile=true}}if(!hostile) continue;battles++;for(const{army} of list){const enemies=list.filter(x=>x.army.ownerId!==army.ownerId).reduce((s,x)=>s+x.army.troops,0);const dmg=Math.floor((enemies*0.08+Math.random()*60)*dt);const before=army.troops;army.troops=Math.max(0,army.troops-dmg);army.morale=Math.max(0,army.morale-0.05*dt);casualties+=before-army.troops;if(army.troops===0){army.morale=0;events.emit('army_destroyed',{provinceId:pid,owner:army.ownerId})}}events.emit('battle_started',{provinceId:pid,armies:list.map(x=>x.eid),owners,casualties})}if(battles) events.emit('combat_tick',{battles,casualties})}}
