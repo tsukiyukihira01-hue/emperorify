@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Grand Strategy - Real ECS Browser</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1219;color:#cbd5e1;font-family:system-ui}
+  #ui{position:fixed;top:0;left:0;right:0;padding:10px;display:flex;gap:10px;align-items:center;background:#0f1219cc;backdrop-filter:blur(6px);z-index:10}
+  button{background:#1e293b;color:#e2e8f0;border:1px solid #334155;padding:8px 12px;border-radius:8px;cursor:pointer}
+  button:hover{background:#334155}
+  canvas{display:block;width:100vw;height:100vh}
+  #log{position:fixed;bottom:10px;left:10px;max-width:360px;font-size:12px;background:#0b0e14cc;padding:8px;border-radius:8px}
+</style>
+</head>
+<body>
+<div id="ui">
+  <strong>ECS Browser</strong>
+  <button id="tick">Tick</button>
+  <button id="run">Run x60</button>
+  <button id="save">Save (IndexedDB bulk)</button>
+  <span id="stats"></span>
+</div>
+<canvas id="map"></canvas>
+<div id="log"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
