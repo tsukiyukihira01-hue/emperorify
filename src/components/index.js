@@ -37,7 +37,13 @@ export class MoveOrder extends Component {
 registerComponent(MoveOrder)
 
 export class TradeRoute extends Component {
-  constructor(fromProvinceId=0, toProvinceId=0, value=5, ownerId=0, active=true){ super(); this.fromProvinceId=fromProvinceId; this.toProvinceId=toProvinceId; this.value=value; this.ownerId=ownerId; this.active=active }
+  constructor(fromProvinceId=0, toProvinceId=0, value=5, ownerId=0, active=true){ super(); this.fromProvinceId=fromProvinceId; this.toProvinceId=toProvinceId; this.value=value; this.ownerId=ownerId; this.active=active; this.fromOwner=ownerId; this.toOwner=0 }
   static tableName(){ return 'c_traderoute' }
 }
 registerComponent(TradeRoute)
+
+export class Building extends Component {
+  constructor(provinceId=0, type='farm', level=1, ownerId=0){ super(); this.provinceId=provinceId; this.type=type; this.level=level; this.ownerId=ownerId }
+  static tableName(){ return 'c_building' }
+}
+registerComponent(Building)
