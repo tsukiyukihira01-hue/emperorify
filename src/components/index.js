@@ -28,3 +28,10 @@ export class Relation extends Component {
   constructor(targetId=0, value=0){ super(); this.targetId=targetId; this.value=value }
 }
 registerComponent(Relation)
+
+// New for AI orders - pure data, AI never edits Army directly
+export class MoveOrder extends Component {
+  constructor(targetProvinceId=0, tx=0, ty=0){ super(); this.targetProvinceId=targetProvinceId; this.tx=tx; this.ty=ty }
+  static tableName(){ return 'c_moveorder' }
+}
+registerComponent(MoveOrder)
