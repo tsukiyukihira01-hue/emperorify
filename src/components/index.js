@@ -24,8 +24,9 @@ export class Economy extends Component {
 }
 registerComponent(Economy)
 
+// Relation now supports ownerId as 3rd arg for diplomacy, backwards compatible
 export class Relation extends Component {
-  constructor(targetId=0, value=0){ super(); this.targetId=targetId; this.value=value }
+  constructor(targetId=0, value=0, ownerId=0){ super(); this.targetId=targetId; this.value=value; this.ownerId=ownerId }
   static tableName(){ return 'c_relation' }
 }
 registerComponent(Relation)
