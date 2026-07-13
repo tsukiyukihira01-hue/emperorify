@@ -19,12 +19,11 @@ export class Province extends Component {
 registerComponent(Province)
 
 export class Economy extends Component {
-  constructor(gold=100, income=0){ super(); this.gold=gold; this.income=income }
+  constructor(gold=100, income=0, ownerId=0){ super(); this.gold=gold; this.income=income; this.ownerId=ownerId }
   static tableName(){ return 'c_economy' }
 }
 registerComponent(Economy)
 
-// Relation now supports ownerId as 3rd arg for diplomacy, backwards compatible
 export class Relation extends Component {
   constructor(targetId=0, value=0, ownerId=0){ super(); this.targetId=targetId; this.value=value; this.ownerId=ownerId }
   static tableName(){ return 'c_relation' }
@@ -36,3 +35,9 @@ export class MoveOrder extends Component {
   static tableName(){ return 'c_moveorder' }
 }
 registerComponent(MoveOrder)
+
+export class TradeRoute extends Component {
+  constructor(fromProvinceId=0, toProvinceId=0, value=5, ownerId=0, active=true){ super(); this.fromProvinceId=fromProvinceId; this.toProvinceId=toProvinceId; this.value=value; this.ownerId=ownerId; this.active=active }
+  static tableName(){ return 'c_traderoute' }
+}
+registerComponent(TradeRoute)
