@@ -1,34 +1,18 @@
-import { Position, Province, Army, Building, TradeRoute } from '../components/index.js'
+import { Position, Province, Army, PLAYER_HOUSE } from '../components/index.js'
 export class Renderer{
-  constructor(canvas, world){
-    this.canvas=canvas; this.world=world; this.ctx=canvas.getContext('2d')
-    this.resize(); addEventListener('resize',()=>this.resize())
-    this.offset={x:40,y:60}; this.scale=1; this.setupPanZoom()
-  }
+  constructor(canvas, world, events){ this.canvas=canvas; this.world=world; this.events=events; this.ctx=canvas.getContext('2d'); this.resize(); addEventListener('resize',()=>this.resize()); this.offset={x:36,y:56}; this.scale=1; this.selectedArmy=null; this.selectedFief=null; this.houseColors={1:'#d4a017',2:'#2c5fa8',3:'#b91c1c',4:'#15803d',5:'#7c3aed'}; this.setupPanZoom(); this.setupClick() }
   resize(){ this.canvas.width=innerWidth; this.canvas.height=innerHeight }
-  setupPanZoom(){
-    let drag=false,last={x:0,y:0}
-    this.canvas.addEventListener('pointerdown',e=>{drag=true; last={x:e.clientX,y:e.clientY}})
-    addEventListener('pointerup',()=>drag=false)
-    addEventListener('pointermove',e=>{ if(!drag) return; this.offset.x+=(e.clientX-last.x)/this.scale; this.offset.y+=(e.clientY-last.y)/this.scale; last={x:e.clientX,y:e.clientY} })
-    this.canvas.addEventListener('wheel',e=>{ e.preventDefault(); const s=e.deltaY<0?1.1:0.9; this.scale=Math.max(0.2,Math.min(4,this.scale*s)) },{passive:false})
-  }
+  setupPanZoom(){ let drag=false,last={x:0,y:0},moved=false; this.canvas.addEventListener('pointerdown',e=>{drag=true; moved=false; last={x:e.clientX,y:e.clientY}}); addEventListener('pointerup',()=>{drag=false; setTimeout(()=>moved=false,40)}); addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-last.x, dy=e.clientY-last.y; if(Math.hypot(dx,dy)>3) moved=true; if(moved){ this.offset.x+=dx/this.scale; this.offset.y+=dy/this.scale; last={x:e.clientX,y:e.clientY} } }); this.canvas.addEventListener('wheel',e=>{ e.preventDefault(); const s=e.deltaY<0?1.1:0.9; this.scale=Math.max(0.25,Math.min(3.5,this.scale*s)) },{passive:false}); this._wasMoved=()=>moved }
+  worldPos(cx,cy){ const r=this.canvas.getBoundingClientRect(); return {x:(cx-r.left)/this.scale - this.offset.x, y:(cy-r.top)/this.scale - this.offset.y} }
+  setupClick(){ this.canvas.addEventListener('click',e=>{ if(this._wasMoved && this._wasMoved()) return; const wp=this.worldPos(e.clientX,e.clientY); let bestFief=null,bd=48, bestArmy=null,ad=42; for(const [eid,[pos,prov]] of this.world.query(Position, Province)){ const d=Math.hypot(pos.x-wp.x,pos.y-wp.y); if(d<bd){bd=d; bestFief={eid,pos,prov,provinceId:pos.provinceId}} } for(const [eid,[pos,army]] of this.world.query(Position, Army)){ const d=Math.hypot(pos.x+20-wp.x,pos.y+62-wp.y); if(d<ad){ad=d; bestArmy={eid,pos,army}} } if(bestArmy && bestArmy.army.ownerId===PLAYER_HOUSE){ this.selectedArmy=bestArmy.eid; this.selectedFief=bestArmy.pos.provinceId; this.events.emit('player_select_army',{entityId:bestArmy.eid,provinceId:bestArmy.pos.provinceId}); return } if(bestFief){ if(this.selectedArmy){ const ap=this.world.getComponent(this.selectedArmy, Position); if(ap && ap.provinceId!==bestFief.provinceId){ this.events.emit('player_move_army',{armyId:this.selectedArmy,targetProvinceId:bestFief.provinceId,house:PLAYER_HOUSE}) } } this.selectedFief=bestFief.provinceId; if(!bestArmy||bestArmy.army.ownerId!==PLAYER_HOUSE) this.selectedArmy=null; this.events.emit('player_select_fief',{provinceId:bestFief.provinceId,fief:bestFief.prov,owner:bestFief.prov.ownerId}) } }) }
   draw(){
     const {ctx,canvas,world}=this
-    ctx.fillStyle='#0f1219'; ctx.fillRect(0,0,canvas.width,canvas.height)
+    ctx.fillStyle='#f4ecd8'; ctx.fillRect(0,0,canvas.width,canvas.height)
     ctx.save(); ctx.scale(this.scale,this.scale); ctx.translate(this.offset.x,this.offset.y)
-    ctx.strokeStyle='#1e293b'; ctx.lineWidth=1
-    for(let i=0;i<20;i++) for(let j=0;j<12;j++) ctx.strokeRect(i*120,j*120,110,110)
-    for(const [,[pos,prov]] of world.query(Position, Province)){
-      ctx.fillStyle=prov.ownerId===1?'#3b82f6cc':'#ef4444aa'
-      ctx.fillRect(pos.x,pos.y,90,20)
-      ctx.fillStyle='#e2e8f0'; ctx.font='11px system-ui'; ctx.fillText(`P tax:${prov.tax}`,pos.x+4,pos.y+13)
-    }
-    for(const [,[pos,army]] of world.query(Position, Army)){
-      ctx.beginPath(); ctx.fillStyle=army.ownerId===1?'#60a5fa':'#f87171'
-      const r=Math.max(6,Math.sqrt(army.troops)/9); ctx.arc(pos.x+20,pos.y+50,r,0,Math.PI*2); ctx.fill()
-      ctx.fillStyle='#fff'; ctx.font='10px system-ui'; ctx.fillText(`${army.troops}`,pos.x+32,pos.y+54)
-    }
+    ctx.strokeStyle='#d6c7a1'; ctx.lineWidth=1; for(let i=0;i<20;i++) for(let j=0;j<12;j++) ctx.strokeRect(i*120,j*120,110,110)
+    for(const [eid,[pos,fief]] of world.query(Position, Province)){ const isP=fief.ownerId===PLAYER_HOUSE; const col=this.houseColors[fief.ownerId]||'#6b7280'; ctx.fillStyle=isP?'#fff7d6':col+'dd'; ctx.fillRect(pos.x,pos.y,104,28); if(isP){ctx.strokeStyle='#d4a017';ctx.lineWidth=2.2;ctx.strokeRect(pos.x-1,pos.y-1,106,30)} if(this.selectedFief===pos.provinceId){ctx.strokeStyle='#111';ctx.lineWidth=2.2;ctx.setLineDash([6,3]);ctx.strokeRect(pos.x-2,pos.y-2,108,32);ctx.setLineDash([])} ctx.fillStyle=isP?'#7a4a00':'#fff8e7'; ctx.font='700 11px ui-serif,serif'; ctx.fillText(`${fief.name||'Fief '+pos.provinceId}${isP?' ★':''}`,pos.x+6,pos.y+18); ctx.fillStyle='#3f2e1a'; ctx.font='10px ui-serif'; ctx.fillText(`tithe:${fief.tax} levy:${Math.floor(fief.manpower)}`,pos.x+2,pos.y+42) }
+    for(const [eid,[pos,host]] of world.query(Position, Army)){ const col=this.houseColors[host.ownerId]||'#444'; const isP=host.ownerId===PLAYER_HOUSE; const r=Math.max(isP?9.5:7, Math.sqrt(host.troops)/6.9); ctx.fillStyle=col; ctx.beginPath(); ctx.arc(pos.x+20,pos.y+64,r,0,Math.PI*2); ctx.fill(); ctx.strokeStyle=isP?'#ffd700':'#fefce8'; ctx.lineWidth=isP?2.5:1.5; ctx.stroke(); if(this.selectedArmy===eid){ctx.beginPath();ctx.arc(pos.x+20,pos.y+64,r+5,0,Math.PI*2);ctx.strokeStyle='#111';ctx.setLineDash([4,3]);ctx.lineWidth=1.3;ctx.stroke();ctx.setLineDash([])} ctx.fillStyle=isP?'#fffbe6':'#fffef0'; ctx.fillRect(pos.x+34,pos.y+46,108,42); ctx.fillStyle='#1f2937'; ctx.font='9px monospace'; const t1=`M:${host.militia}${host.man_at_arms?'+'+host.man_at_arms:''} C:${host.light_cavalry}${host.knight?'+'+host.knight:''}`; const t2=`A:${host.archer}${host.longbowman?'+'+host.longbowman:''} T:${host.troops}`; ctx.fillText(t1,pos.x+36,pos.y+58); ctx.fillText(t2,pos.x+36,pos.y+70); if(isP){ctx.fillStyle='#b45309';ctx.font='700 7px system-ui';ctx.fillText('YOUR HOST',pos.x+36,pos.y+80)} }
     ctx.restore()
+    ctx.fillStyle='#3f2e1a'; ctx.font='600 12px ui-serif'; ctx.fillText('★ YOU House 1 | T1: Militia/LightCav/Archer | T2: Man-at-Arms (Keep2) Knight (Keep2+Market1) Longbow (Market2) | Counter: Infantry>Cav>Ranged>Inf',12,20)
   }
 }
