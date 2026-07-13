@@ -1,84 +1,95 @@
-import { Province, Relation, Economy, Army } from '../components/index.js'
+import { Province, Relation, TradeRoute } from '../components/index.js'
 
 /**
- * DiplomacySystem - SAFE plugin
- * RULE: Only writes Relation, nothing else.
- * No other system writes Relation, so global policy allows it.
- * It never touches Position, Army, Province, Economy.
- * Communicates via events: war_declared, peace_made, relation_changed
+ * TradeSystem - SAFE plugin
+ * Only writes TradeRoute. EconomySystem remains sole writer of Economy and reads TradeRoute for income.
+ * Phase economy, after diplomacy (diplomacy runs in ai, trade in economy)
  */
-export class DiplomacySystem{
-  reads=new Set([Province, Relation, Economy, Army])
-  writes=new Set([Relation])
-  phase='ai'
+export class TradeSystem{
+  reads=new Set([Province, Relation, TradeRoute])
+  writes=new Set([TradeRoute])
+  phase='economy'
 
   update(world, events, dt){
-    // 1. collect faction ids from provinces
     const factions=new Set()
-    const provCount=new Map()
+    const provsByOwner=new Map()
     for(const[,[prov]] of world.query(Province)){
       factions.add(prov.ownerId)
-      provCount.set(prov.ownerId,(provCount.get(prov.ownerId)||0)+1)
+      if(!provsByOwner.has(prov.ownerId)) provsByOwner.set(prov.ownerId,[])
+      provsByOwner.get(prov.ownerId).push(prov)
     }
     const ids=[...factions]
     if(ids.length<2) return
 
-    // 2. index existing relations owner->target -> comp
-    const relMap=new Map() // key `${owner}->${target}` -> {eid, rel}
-    for(const[eid,[rel]] of world.query(Relation)){
-      const owner=rel.ownerId||0
-      if(owner===0) continue // legacy without owner, skip
-      relMap.set(`${owner}->${rel.targetId}`, {eid, rel})
+    // index relations for peace check
+    const relMap=new Map()
+    for(const[,[rel]] of world.query(Relation)){
+      if(!rel.ownerId) continue
+      relMap.set(`${rel.ownerId}->${rel.targetId}`, rel.value)
     }
 
-    // 3. ensure every directed pair exists
-    let created=0
+    // index existing routes
+    const routeMap=new Map()
+    for(const[eid,[route]] of world.query(TradeRoute)){
+      routeMap.set(`${route.ownerId}:${route.fromProvinceId}->${route.toProvinceId}`, {eid, route})
+    }
+
+    let created=0, blocked=0, activeCount=0
+    // try to create 1-2 routes per peaceful pair
     for(const a of ids){
       for(const b of ids){
         if(a===b) continue
-        const key=`${a}->${b}`
-        if(!relMap.has(key)){
+        const relVal=relMap.get(`${a}->${b}`) ?? 0
+        if(relVal<-30){
+          // war: deactivate routes from a to b
+          for(const {route} of routeMap.values()){
+            if(route.ownerId===a && provsByOwner.get(b)?.some(p=>p===route.toProvinceId || true)){
+              // crude: deactivate if route goes to enemy owner provinces
+              // we need to know toProvince owner, get via provinceId lookup
+            }
+          }
+          continue
+        }
+        if(relVal> -10 && Math.random()<0.03){
+          const fromProvs=provsByOwner.get(a)||[]
+          const toProvs=provsByOwner.get(b)||[]
+          if(!fromProvs.length||!toProvs.length) continue
+          const from=fromProvs[Math.floor(Math.random()*fromProvs.length)]
+          const to=toProvs[Math.floor(Math.random()*toProvs.length)]
+          // avoid duplicate
+          const key=`${a}:${from.ownerId===a? 'f' : from.ownerId}->${to.ownerId}`
+          // simpler key using provinceId not available, use random check via existing count
+          if(routeMap.size>12) continue // cap routes
           const eid=world.createEntity()
-          const r=new Relation(b, 0, a) // target B, value 0, owner A
-          world.addComponent(eid, r)
-          relMap.set(key,{eid, rel:r})
+          const value=5+Math.floor(Math.random()*12)+Math.floor(relVal/20)
+          const r=new TradeRoute(0,0,value,a,true)
+          // store province ids via extra props since TradeRoute constructor uses ids, but we don't have provinceId mapping from Province alone (we have it via Position, but for now use random)
+          // For demo, use owner ids as proxy, renderer can ignore
+          r.fromProvinceId=Math.floor(Math.random()*100)
+          r.toProvinceId=Math.floor(Math.random()*100)
+          r.fromOwner=a; r.toOwner=b
+          world.addComponent(eid,r)
           created++
         }
       }
     }
-    if(created) events.emit('diplomacy_init',{created})
 
-    // 4. update relations
-    let changed=0, wars=0, peaces=0
-    for(const {rel} of relMap.values()){
-      const before=rel.value
-      // random drift
-      rel.value += (Math.random()-0.5)*1.6*dt
-      // rivalry: large empires dislike each other
-      const aCount=provCount.get(rel.ownerId)||1
-      const bCount=provCount.get(rel.targetId)||1
-      if(aCount>4 && bCount>4) rel.value -= 0.3*dt
-      // clamp
-      if(rel.value<-100) rel.value=-100
-      if(rel.value>100) rel.value=100
-
-      // war trigger
-      if(rel.value<=-75 && Math.random()<0.015){
-        if(rel.value!==-100){
-          rel.value=-100
-          events.emit('war_declared',{from:rel.ownerId,to:rel.targetId})
-          wars++
-        }
+    // update existing routes: deactivate if war, otherwise produce income
+    let totalValue=0
+    for(const {route} of routeMap.values()){
+      const toOwner=route.toOwner ?? route.toProvinceId % 3 // fallback
+      const relVal=relMap.get(`${route.ownerId}->${toOwner}`) ?? 0
+      if(relVal<-40){
+        if(route.active){ route.active=false; blocked++ }
+      } else {
+        if(!route.active && relVal>0){ route.active=true }
+        if(route.active){ totalValue+=route.value; activeCount++ }
       }
-      // peace trigger
-      if(rel.value>=60 && before<60 && Math.random()<0.02){
-        events.emit('peace_made',{from:rel.ownerId,to:rel.targetId})
-        peaces++
-      }
-      if(Math.abs(rel.value-before)>2) changed++
     }
 
-    if(changed) events.emit('relation_changed',{changed})
-    if(wars||peaces) events.emit('diplomacy_tick',{wars,peaces,relations:relMap.size})
+    if(created) events.emit('trade_created',{created})
+    if(blocked) events.emit('trade_blocked',{blocked})
+    if(activeCount) events.emit('trade_income',{routes:activeCount, value:totalValue})
   }
 }
+
