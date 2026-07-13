@@ -62,19 +62,20 @@ events.on('diplomacy_init',d=>log(`Diplomacy ${d.created} relations`))
 events.on('war_declared',d=>log(`WAR ${d.from}->${d.to}`))
 events.on('peace_made',d=>log(`Peace ${d.from}<->${d.to}`))
 events.on('trade_created',d=>log(`Trade +${d.created}`))
-events.on('trade_blocked',d=>log(`Trade blocked ${d.blocked}`))
 events.on('building_built',d=>log(`Built ${d.type} for ${d.owner}`))
-events.on('building_upgraded',d=>log(`Upgrade ${d.type} to Lv${d.level}`))
-events.on('economy_tick',d=>{})
+events.on('building_upgraded',d=>log(`Upgrade ${d.type} Lv${d.level}`))
+events.on('battle_started',d=>log(`Battle in ${d.provinceId} ${d.owners.join('vs')} -${d.casualties||0}`))
+events.on('army_destroyed',d=>log(`Army of ${d.owner} destroyed in ${d.provinceId}`))
+events.on('combat_tick',d=>log(`Combat ${d.battles} battles ${d.casualties} dead`))
 events.on('validation_failed',d=>log(`Fix ${d.errors.length} after ${d.phase}`))
 events.on('system_error',d=>log(`Crash ${d.system}: ${d.message}`))
 
 document.getElementById('tick').onclick=()=>{ engine.tick(1); updateStats() }
 document.getElementById('run').onclick=async()=>{ for(let i=0;i<60;i++){ engine.tick(1); await new Promise(r=>setTimeout(r,16)) } updateStats() }
-document.getElementById('save').onclick=async()=>{ try{ await repo.bulkSave(world); log('Saved v3 builder+trade+diplomacy') }catch(e){ log('Save err '+e.message) } }
+document.getElementById('save').onclick=async()=>{ try{ await repo.bulkSave(world); log('Saved v3 full empire') }catch(e){ log('Save err '+e.message) } }
 document.getElementById('clear')?.addEventListener('click', async()=>{ await repo.clear(); location.reload() })
 
 try{ await repo.loadAll(world); log('Save loaded') }catch{ log('No save') }
 boot(); updateStats()
 ;(function loop(){ try{ renderer.draw() }catch(e){ log('Render '+e.message) } requestAnimationFrame(loop) })()
-log('READY builder safe')
+log('READY full empire combat+builder+trade+diplomacy')
