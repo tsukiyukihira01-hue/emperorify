@@ -26,8 +26,14 @@ export class TickEngine{
     this.tickCount++
     for(const ph of PHASES){
       const list=this.systemsByPhase.get(ph)||[]
-      for(const s of list){ try{ s.update(this.world,this.events,dt) }catch(e){ console.error(e); this.events.emit('system_error',{system:s.constructor.name,phase:ph,message:e.message}) } }
-      try{ const errs=validateWorld(this.world); if(errs.length){ this.events.emit('validation_failed',{phase:ph,errors:errs}); autoFixWorld(this.world,errs); this.events.emit('validation_fixed',{phase:ph,fixed:errs.length}) } }catch{}
+      for(const s of list){
+        try{ s.update(this.world,this.events,dt) }
+        catch(e){ console.error(e); this.events.emit('system_error',{system:s.constructor.name,phase:ph,message:e.message}) }
+      }
+      try{
+        const errs=validateWorld(this.world)
+        if(errs.length){ this.events.emit('validation_failed',{phase:ph,errors:errs}); autoFixWorld(this.world,errs); this.events.emit('validation_fixed',{phase:ph,fixed:errs.length}) }
+      }catch{}
     }
     this.world.commit()
     this.events.emit('tick_end',{tick:this.tickCount})
